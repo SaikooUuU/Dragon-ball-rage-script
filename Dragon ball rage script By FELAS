@@ -1,0 +1,293 @@
+-- Dragon Ball Rage FELAS (VERSÃO MELHORADA)
+-- Xeno PC - Organizado e Visualmente Aprimorado
+
+local player = game.Players.LocalPlayer
+local vim = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+
+-- ===== CONFIGURAÇÕES CENTRALIZADAS =====
+-- EDITE AQUI TODOS OS TEMPOS (em segundos)
+local Settings = {
+    -- Tempo que a tecla R fica pressionada
+    DefenseHoldTime = 4,
+    
+    -- Tempo que a tecla Q fica pressionada
+    KiTrainHoldTime = 4,
+    
+    -- Tempo que a tecla C fica pressionada
+    ChargeKiHoldTime = 8,
+    
+    -- Tempo de espera após soltar R ou Q
+    ReleaseWaitTime = 0.2,
+    
+    -- Tempo de espera após soltar C
+    ChargeKiCooldown = 3,
+}
+
+-- ===== STATES (NÃO ALTERAR) =====
+local States = {
+    Strength = false,
+    Defense = false,
+    KiTrain = false,
+    ChargeKi = false,
+    PausedAll = false
+}
+
+local StatusTexts = {
+    Strength = "Idle",
+    Defense = "Idle",
+    KiTrain = "Idle",
+    ChargeKi = "Idle"
+}
+
+-- ===== GUI MODERNA =====
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "DBR_FINAL_GUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 420, 0, 380)
+frame.Position = UDim2.new(0.5, -210, 0.5, -190)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 12)
+
+-- Borda sutil
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(255, 80, 80)
+stroke.Thickness = 2
+stroke.Transparency = 0.5
+
+-- TÍTULO
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -80, 0, 50)
+title.Position = UDim2.new(0, 20, 0, 10)
+title.BackgroundTransparency = 1
+title.Text = "🐉 Dragon Ball Rage |FELAS"
+title.TextColor3 = Color3.fromRGB(255, 100, 100)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- BOTÃO FECHAR
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 40, 0, 40)
+close.Position = UDim2.new(1, -50, 0, 10)
+close.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+close.Text = "✕"
+close.TextColor3 = Color3.fromRGB(255, 255, 255)
+close.Font = Enum.Font.GothamBold
+close.TextSize = 20
+close.BorderSizePixel = 0
+
+local closeCorner = Instance.new("UICorner", close)
+closeCorner.CornerRadius = UDim.new(0, 8)
+
+close.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Animação hover no botão fechar
+close.MouseEnter:Connect(function()
+    TweenService:Create(close, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(220, 60, 60)}):Play()
+end)
+close.MouseLeave:Connect(function()
+    TweenService:Create(close, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(180, 40, 40)}):Play()
+end)
+
+-- BOTÃO PAUSE ALL
+local pauseBtn = Instance.new("TextButton", frame)
+pauseBtn.Size = UDim2.new(0, 380, 0, 45)
+pauseBtn.Position = UDim2.new(0, 20, 0, 70)
+pauseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+pauseBtn.Text = "⏸ PAUSE ALL"
+pauseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+pauseBtn.Font = Enum.Font.GothamBold
+pauseBtn.TextSize = 16
+pauseBtn.BorderSizePixel = 0
+
+local pauseCorner = Instance.new("UICorner", pauseBtn)
+pauseCorner.CornerRadius = UDim.new(0, 8)
+
+pauseBtn.MouseButton1Click:Connect(function()
+    States.PausedAll = not States.PausedAll
+    if States.PausedAll then
+        pauseBtn.Text = "▶ RESUME ALL"
+        pauseBtn.BackgroundColor3 = Color3.fromRGB(80, 150, 80)
+    else
+        pauseBtn.Text = "⏸ PAUSE ALL"
+        pauseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    end
+end)
+
+-- Animação hover pause button
+pauseBtn.MouseEnter:Connect(function()
+    TweenService:Create(pauseBtn, TweenInfo.new(0.2), {BackgroundColor3 = States.PausedAll and Color3.fromRGB(100, 170, 100) or Color3.fromRGB(80, 80, 90)}):Play()
+end)
+pauseBtn.MouseLeave:Connect(function()
+    TweenService:Create(pauseBtn, TweenInfo.new(0.2), {BackgroundColor3 = States.PausedAll and Color3.fromRGB(80, 150, 80) or Color3.fromRGB(60, 60, 70)}):Play()
+end)
+
+-- FUNÇÃO PARA CRIAR TOGGLES MODERNOS
+local function makeToggle(text, key, yPos, stateKey, statusKey)
+    local container = Instance.new("Frame", frame)
+    container.Size = UDim2.new(0, 380, 0, 55)
+    container.Position = UDim2.new(0, 20, 0, yPos)
+    container.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    container.BorderSizePixel = 0
+    
+    local containerCorner = Instance.new("UICorner", container)
+    containerCorner.CornerRadius = UDim.new(0, 8)
+    
+    local btn = Instance.new("TextButton", container)
+    btn.Size = UDim2.new(0, 100, 0, 35)
+    btn.Position = UDim2.new(1, -110, 0, 10)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = "OFF"
+    btn.BorderSizePixel = 0
+    
+    local btnCorner = Instance.new("UICorner", btn)
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    
+    local label = Instance.new("TextLabel", container)
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.Position = UDim2.new(0, 15, 0, 8)
+    label.BackgroundTransparency = 1
+    label.Text = text .. " (" .. key .. ")"
+    label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local status = Instance.new("TextLabel", container)
+    status.Size = UDim2.new(0, 200, 0, 18)
+    status.Position = UDim2.new(0, 15, 0, 30)
+    status.BackgroundTransparency = 1
+    status.Text = "Status: Idle"
+    status.TextColor3 = Color3.fromRGB(150, 150, 160)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 11
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    
+    btn.MouseButton1Click:Connect(function()
+        States[stateKey] = not States[stateKey]
+        btn.Text = States[stateKey] and "ON" or "OFF"
+        
+        if States[stateKey] then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 180, 100)}):Play()
+        else
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 70)}):Play()
+            StatusTexts[statusKey] = "Idle"
+        end
+    end)
+    
+    -- Animação hover
+    btn.MouseEnter:Connect(function()
+        if States[stateKey] then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(100, 200, 120)}):Play()
+        else
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 80, 90)}):Play()
+        end
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        if States[stateKey] then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 180, 100)}):Play()
+        else
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60, 60, 70)}):Play()
+        end
+    end)
+    
+    -- Atualizar status em tempo real
+    task.spawn(function()
+        while true do
+            status.Text = "Status: " .. StatusTexts[statusKey]
+            task.wait(0.1)
+        end
+    end)
+end
+
+makeToggle("Auto Strength", "E", 130, "Strength", "Strength")
+makeToggle("Auto Defense", "R", 195, "Defense", "Defense")
+makeToggle("Auto Ki Train", "Q", 260, "KiTrain", "KiTrain")
+makeToggle("Auto Charge Ki", "C", 325, "ChargeKi", "ChargeKi")
+
+-- ===== LÓGICA FUNCIONAL (NÃO ALTERADA) =====
+
+-- AUTO STRENGTH (E) - Mantém pressionado enquanto ativo
+task.spawn(function()
+    while true do
+        if States.Strength and not States.PausedAll then
+            StatusTexts.Strength = "Holding E"
+            vim:SendKeyEvent(true, "E", false, game)
+        else
+            StatusTexts.Strength = "Idle"
+            vim:SendKeyEvent(false, "E", false, game)
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- AUTO DEFENSE (R) - Segura por tempo definido
+task.spawn(function()
+    while true do
+        if States.Defense and not States.PausedAll then
+            StatusTexts.Defense = "Holding R"
+            vim:SendKeyEvent(true, "R", false, game)
+            task.wait(Settings.DefenseHoldTime)
+            
+            StatusTexts.Defense = "Releasing"
+            vim:SendKeyEvent(false, "R", false, game)
+            task.wait(Settings.ReleaseWaitTime)
+        else
+            StatusTexts.Defense = "Idle"
+            vim:SendKeyEvent(false, "R", false, game)
+            task.wait(0.2)
+        end
+    end
+end)
+
+-- AUTO KI TRAIN (Q) - Segura por tempo definido
+task.spawn(function()
+    while true do
+        if States.KiTrain and not States.PausedAll then
+            StatusTexts.KiTrain = "Holding Q"
+            vim:SendKeyEvent(true, "Q", false, game)
+            task.wait(Settings.KiTrainHoldTime)
+            
+            StatusTexts.KiTrain = "Releasing"
+            vim:SendKeyEvent(false, "Q", false, game)
+            task.wait(Settings.ReleaseWaitTime)
+        else
+            StatusTexts.KiTrain = "Idle"
+            vim:SendKeyEvent(false, "Q", false, game)
+            task.wait(0.2)
+        end
+    end
+end)
+
+-- AUTO CHARGE KI (C) - Segura e aguarda cooldown
+task.spawn(function()
+    while true do
+        if States.ChargeKi and not States.PausedAll then
+            StatusTexts.ChargeKi = "Charging"
+            vim:SendKeyEvent(true, "C", false, game)
+            task.wait(Settings.ChargeKiHoldTime)
+            
+            StatusTexts.ChargeKi = "Cooldown"
+            vim:SendKeyEvent(false, "C", false, game)
+            task.wait(Settings.ChargeKiCooldown)
+        else
+            StatusTexts.ChargeKi = "Idle"
+            vim:SendKeyEvent(false, "C", false, game)
+            task.wait(0.5)
+        end
+    end
+end)
